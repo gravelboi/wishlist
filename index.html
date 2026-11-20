@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Новогодний вишлист</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎄</text></svg>">
+<style>
+  :root {
+    --bg: #faf8f5;
+    --board: #ffffff;
+    --line: #ece8e2;
+    --text: #2b2b2b;
+    --muted: #9a958e;
+    --accent: #c0504d;
+    --shadow: 0 1px 2px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.06);
+    --shadow-lift: 0 6px 24px rgba(0,0,0,.14);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 18px 20px 10px;
+    text-align: center;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: .02em;
+  }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+  header .sync { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+  header .sync::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%; background: #cfc9c0;
+  }
+  header .sync.online::before { background: #6bbf7a; }
+  header .sync.connecting::before, header .sync.offline::before { background: #e8b84a; }
+  header .sync.error { color: var(--accent); }
+  header .sync.error::before { background: var(--accent); }
+
+  .tabs { display: none; }
+
+  main {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    padding: 10px 16px 16px;
+    min-height: 0;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .column-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px 10px;
+  }
+  .column-head h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .column-head .count { color: var(--muted); font-weight: 400; margin-left: 6px; font-size: 14px; }
+
+  .add-btn {
+    border: 1px solid var(--line);
+    background: var(--board);
+    color: var(--text);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .board {
+    position: relative;
+    flex: 1;
+    background: var(--board);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    overflow: auto;
+    background-image: radial-gradient(var(--line) 1px, transparent 1px);
+    background-size: 22px 22px;
+    touch-action: pan-y;
+  }
+  .board-inner { position: relative; min-height: 100%; }
+
+  .empty {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+    text-align: center;
+    padding: 20px;
+  }
+
+  .board-inner { --sw: 160px; }
+  .sticker {
+    position: absolute;
+    width: var(--sw);
+    min-height: 120px;
+    padding: 14px 14px 12px;
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: box-shadow .15s, transform .15s;
+  }
+  .sticker:hover { box-shadow: var(--shadow-lift); }
+  .sticker.dragging {
+    cursor: grabbing;
+    box-shadow: var(--shadow-lift);
+    transform: rotate(-2deg) scale(1.03);
+    transition: none;
+  }
+  .sticker .title {
+    font-size: 15px;
+    line-height: 1.3;
+    word-break: break-word;
+    flex: 1;
+  }
+  .sticker .link {
+    font-size: 12px;
+    color: rgba(0,0,0,.55);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(0,0,0,.2);
+    align-self: flex-start;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .sticker .link:hover { color: rgba(0,0,0,.85); }
+
+  .c-yellow { background: #fff6c7; }
+  .c-pink   { background: #ffe1e4; }
+  .c-blue   { background: #dcecff; }
+  .c-green  { background: #dff3e3; }
+  .c-white  { background: #f4f1ec; }
+
+  /* Dialog */
+  dialog {
+    border: none;
+    border-radius: 16px;
+    padding: 22px;
+    width: min(380px, calc(100vw - 32px));
+    box-shadow: 0 20px 60px rgba(0,0,0,.18);
+    color: var(--text);
+  }
+  dialog::backdrop { background: rgba(40,35,30,.25); backdrop-filter: blur(2px); }
+  dialog h3 { margin: 0 0 16px; font-size: 17px; font-weight: 600; }
+  dialog label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  dialog input[type=text] {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    font: inherit;
+    font-size: 16px;
+    margin-bottom: 14px;
+    outline: none;
+    background: #fff;
+  }
+  dialog input:focus { border-color: #cfc7bc; }
+  .colors { display: flex; gap: 10px; margin-bottom: 20px; }
+  .colors input { display: none; }
+  .colors span {
+    display: block;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    cursor: pointer;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06);
+  }
+  .colors input:checked + span { border-color: var(--text); }
+  .actions { display: flex; gap: 8px; align-items: center; }
+  .actions .spacer { flex: 1; }
+  .btn {
+    border: 1px solid var(--line);
+    background: #fff;
+    border-radius: 10px;
+    padding: 9px 16px;
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .btn.primary { background: var(--text); color: #fff; border-color: var(--text); }
+  .btn.danger { color: var(--accent); border-color: transparent; padding-left: 4px; padding-right: 4px; background: none; }
+
+  /* Mobile: tabs instead of split */
+  @media (max-width: 720px) {
+    header { padding: 14px 16px 8px; }
+    .tabs {
+      display: flex;
+      margin: 6px 16px 0;
+      background: #efebe5;
+      border-radius: 12px;
+      padding: 4px;
+    }
+    .tabs button {
+      flex: 1;
+      border: none;
+      background: none;
+      font: inherit;
+      font-size: 15px;
+      padding: 9px 0;
+      border-radius: 9px;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tabs button.active { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    main { grid-template-columns: 1fr; padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); }
+    .column { display: none; }
+    .column.active { display: flex; }
+    .column-head h2 { display: none; }
+    .column-head { justify-content: flex-end; }
+    .board-inner { --sw: 140px; }
+    .sticker { min-height: 110px; }
+  }
+</style>
+</head>
+<body>
+  <header>
+    <h1>🎄 Новогодний вишлист</h1>
+    <p>Добавляй желания, перетаскивай листочки, нажми на листочек, чтобы изменить</p>
+    <p class="sync" id="sync"></p>
+  </header>
+
+  <nav class="tabs">
+    <button data-tab="oleg" class="active">Олег</button>
+    <button data-tab="olya">Оля</button>
+  </nav>
+
+  <main>
+    <section class="column active" data-owner="oleg">
+      <div class="column-head">
+        <h2>Олег<span class="count"></span></h2>
+        <button class="add-btn" data-add="oleg">+ Желание</button>
+      </div>
+      <div class="board"><div class="board-inner"></div><div class="empty">Пока пусто — добавь первое желание</div></div>
+    </section>
+    <section class="column" data-owner="olya">
+      <div class="column-head">
+        <h2>Оля<span class="count"></span></h2>
+        <button class="add-btn" data-add="olya">+ Желание</button>
+      </div>
+      <div class="board"><div class="board-inner"></div><div class="empty">Пока пусто — добавь первое желание</div></div>
+    </section>
+  </main>
+
+  <dialog id="editor">
+    <form method="dialog" id="editor-form">
+      <h3 id="editor-title">Новое желание</h3>
+      <label for="f-title">Что хочется</label>
+      <input type="text" id="f-title" required maxlength="120" placeholder="Например, тёплый плед">
+      <label for="f-url">Ссылка на товар</label>
+      <input type="text" id="f-url" placeholder="https://…" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <label>Цвет</label>
+      <div class="colors">
+        <label><input type="radio" name="color" value="yellow" checked><span class="c-yellow"></span></label>
+        <label><input type="radio" name="color" value="pink"><span class="c-pink"></span></label>
+        <label><input type="radio" name="color" value="blue"><span class="c-blue"></span></label>
+        <label><input type="radio" name="color" value="green"><span class="c-green"></span></label>
+        <label><input type="radio" name="color" value="white"><span class="c-white"></span></label>
+      </div>
+      <div class="actions">
+        <button type="button" class="btn danger" id="f-delete">Удалить</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" id="f-cancel">Отмена</button>
+        <button type="submit" class="btn primary">Сохранить</button>
+      </div>
+    </form>
+  </dialog>
+
+<script type="module">
+// ===== НАСТРОЙКА СИНХРОНИЗАЦИИ =====
+// Вставь сюда объект firebaseConfig из консоли Firebase (инструкция в README.md).
+// Пока здесь null, желания хранятся только в этом браузере.
+const FIREBASE_CONFIG = null;
+
+(() => {
+  const KEY = 'ny-wishlist-v1';
+  const COLORS = ['yellow', 'pink', 'blue', 'green', 'white'];
+  const FIREBASE_VERSION = '10.12.2';
+
+  const boards = {
+    oleg: document.querySelector('[data-owner="oleg"]'),
+    olya: document.querySelector('[data-owner="olya"]'),
+  };
+
+  // ---- storage: local cache + optional Firebase ----
+  const state = { items: [] };
+  const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+
+  function clean(it) {
+    if (!it || typeof it.id !== 'string' || !boards[it.owner]) return null;
+    return {
+      id: it.id,
+      owner: it.owner,
+      title: String(it.title || '').slice(0, 120),
+      url: /^https?:\/\//i.test(it.url || '') ? it.url : '',
+      color: COLORS.includes(it.color) ? it.color : 'yellow',
+      x: Math.max(0, Math.min(100, +it.x || 0)),
+      y: Math.max(0, +it.y || 0),
+      z: +it.z || 0,
+    };
+  }
+  function setItems(list) {
+    state.items = list.map(clean).filter(Boolean).sort((a, b) => a.z - b.z);
+  }
+  try { setItems((JSON.parse(lsGet(KEY)) || {}).items || []); } catch (e) {}
+  const saveLocal = () => lsSet(KEY, JSON.stringify({ items: state.items }));
+
+  let remote = null;          // { put(item), remove(id) } once Firebase is connected
+  let pendingRender = false;  // remote update arrived mid-drag
+
+  function putItem(item) {
+    const list = state.items.filter(i => i.id !== item.id);
+    list.push(item);
+    setItems(list);
+    saveLocal(); render();
+    if (remote) remote.put(clean(item));
+  }
+  function removeItem(id) {
+    state.items = state.items.filter(i => i.id !== id);
+    saveLocal(); render();
+    if (remote) remote.remove(id);
+  }
+  const findItem = id => state.items.find(i => i.id === id);
+
+  const syncEl = document.getElementById('sync');
+  function setSync(mode, extra) {
+    const text = {
+      local: 'Хранится только в этом браузере',
+      connecting: 'Подключение…',
+      online: 'Синхронизировано',
+      offline: 'Нет связи: изменения отправятся, когда появится сеть',
+      error: 'Ошибка синхронизации' + (extra ? ': ' + extra : ''),
+    }[mode];
+    syncEl.className = 'sync ' + mode;
+    syncEl.textContent = text;
+  }
+
+  async function connect() {
+    if (!FIREBASE_CONFIG) { setSync('local'); return; }
+    setSync('connecting');
+    const onErr = e => {
+      console.error(e);
+      const denied = /permission/i.test(String(e && (e.code || e.message)));
+      setSync('error', denied ? 'нет доступа, проверь правила базы' : 'смотри консоль');
+    };
+    try {
+      const base = `https://www.gstatic.com/firebasejs/${FIREBASE_VERSION}`;
+      const { initializeApp } = await import(`${base}/firebase-app.js`);
+      const db = await import(`${base}/firebase-database.js`);
+      const database = db.getDatabase(initializeApp(FIREBASE_CONFIG));
+      const itemsRef = db.ref(database, 'wishlist/items');
+
+      remote = {
+        put: item => db.set(db.child(itemsRef, item.id), item).catch(onErr),
+        remove: id => db.remove(db.child(itemsRef, id)).catch(onErr),
+      };
+
+      db.onValue(db.ref(database, '.info/connected'), s => setSync(s.val() ? 'online' : 'offline'));
+
+      let first = true;
+      db.onValue(itemsRef, snap => {
+        const remoteItems = Object.values(snap.val() || {});
+        if (first) {
+          first = false;
+          // One-time upload of wishes made before sync was turned on
+          if (!remoteItems.length && state.items.length && !lsGet(KEY + '-uploaded')) {
+            lsSet(KEY + '-uploaded', '1');
+            state.items.forEach(i => remote.put(i));
+            return;
+          }
+          lsSet(KEY + '-uploaded', '1');
+        }
+        setItems(remoteItems);
+        saveLocal();
+        if (drag) pendingRender = true; else render();
+      }, onErr);
+    } catch (e) { onErr(e); }
+  }
+
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+  function normalizeUrl(u) {
+    u = (u || '').trim();
+    if (!u) return '';
+    if (!/^https?:\/\//i.test(u)) u = 'https://' + u;
+    return u;
+  }
+  function hostOf(u) {
+    try { return new URL(u).hostname.replace(/^www\./, ''); } catch (e) { return u; }
+  }
+
+  // ---- render ----
+  function render() {
+    for (const owner of Object.keys(boards)) {
+      const col = boards[owner];
+      const inner = col.querySelector('.board-inner');
+      const items = state.items.filter(i => i.owner === owner);
+      inner.innerHTML = '';
+      let maxBottom = 0;
+      for (const item of items) {
+        const el = document.createElement('div');
+        el.className = 'sticker c-' + (COLORS.includes(item.color) ? item.color : 'yellow');
+        el.dataset.id = item.id;
+        // keep sticker fully inside the board on any screen width
+        el.style.left = `min(${item.x}%, calc(100% - var(--sw)))`;
+        el.style.top = item.y + 'px';
+
+        const t = document.createElement('div');
+        t.className = 'title';
+        t.textContent = item.title;
+        el.appendChild(t);
+
+        if (item.url) {
+          const a = document.createElement('a');
+          a.className = 'link';
+          a.href = item.url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.textContent = '↗ ' + hostOf(item.url);
+          el.appendChild(a);
+        }
+        inner.appendChild(el);
+        maxBottom = Math.max(maxBottom, item.y + 180);
+      }
+      inner.style.height = maxBottom ? maxBottom + 'px' : '';
+      col.querySelector('.empty').style.display = items.length ? 'none' : '';
+      col.querySelector('.count').textContent = items.length ? items.length : '';
+    }
+  }
+
+  // ---- drag ----
+  let drag = null;
+
+  document.addEventListener('pointerdown', e => {
+    const el = e.target.closest('.sticker');
+    if (!el || e.button > 0) return;
+    if (e.target.closest('a')) return; // let links work
+    const item = findItem(el.dataset.id);
+    if (!item) return;
+    const inner = el.parentElement;
+    const r = el.getBoundingClientRect();
+    drag = {
+      el, item, inner,
+      startX: e.clientX, startY: e.clientY,
+      offX: e.clientX - r.left, offY: e.clientY - r.top,
+      moved: false, pointerId: e.pointerId,
+    };
+    el.setPointerCapture(e.pointerId);
+  });
+
+  document.addEventListener('pointermove', e => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const dx = e.clientX - drag.startX, dy = e.clientY - drag.startY;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.el.classList.add('dragging');
+      drag.el.style.zIndex = 1000;
+    }
+    const ir = drag.inner.getBoundingClientRect();
+    const w = drag.el.offsetWidth;
+    let px = e.clientX - ir.left - drag.offX;
+    let py = e.clientY - ir.top - drag.offY;
+    px = Math.max(0, Math.min(px, ir.width - w));
+    py = Math.max(0, py);
+    drag.el.style.left = (px / ir.width * 100) + '%';
+    drag.el.style.top = py + 'px';
+    drag.px = px; drag.py = py; drag.iw = ir.width;
+  });
+
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const d = drag; drag = null;
+    const current = findItem(d.item.id) || d.item;
+    pendingRender = false;
+    if (d.moved) {
+      // new position + bring to front
+      putItem({ ...current, x: +(d.px / d.iw * 100).toFixed(2), y: Math.round(d.py), z: Date.now() });
+    } else {
+      render();
+      if (e.type === 'pointerup') openEditor(current);
+    }
+  }
+  document.addEventListener('pointerup', endDrag);
+  document.addEventListener('pointercancel', endDrag);
+
+  // ---- editor ----
+  const dlg = document.getElementById('editor');
+  const form = document.getElementById('editor-form');
+  const fTitle = document.getElementById('f-title');
+  const fUrl = document.getElementById('f-url');
+  const fDelete = document.getElementById('f-delete');
+  let editing = null; // {item} or {owner}
+
+  function openEditor(item, owner) {
+    editing = item ? { item } : { owner };
+    document.getElementById('editor-title').textContent = item ? 'Изменить желание' : 'Новое желание';
+    fTitle.value = item ? item.title : '';
+    fUrl.value = item ? item.url : '';
+    const color = item ? item.color : COLORS[Math.floor(Math.random() * 4)];
+    form.querySelector(`input[name=color][value="${color}"]`).checked = true;
+    fDelete.style.visibility = item ? 'visible' : 'hidden';
+    dlg.showModal();
+    if (!item) setTimeout(() => fTitle.focus(), 30);
+  }
+
+  function freeSpot(owner) {
+    const inner = boards[owner].querySelector('.board-inner');
+    const w = inner.clientWidth || 300;
+    const sw = w <= 400 ? 150 : 175; // sticker + gap
+    const perRow = Math.max(1, Math.floor((w - 12) / sw));
+    const n = state.items.filter(i => i.owner === owner).length;
+    const col = n % perRow, row = Math.floor(n / perRow);
+    const jitter = () => Math.random() * 6 - 3;
+    return {
+      x: +(((12 + col * sw) / w) * 100 + jitter() * 0.3).toFixed(2),
+      y: Math.max(0, Math.round(12 + row * 150 + jitter())),
+    };
+  }
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    const title = fTitle.value.trim();
+    if (!title) { fTitle.focus(); return; }
+    const url = normalizeUrl(fUrl.value);
+    const color = form.querySelector('input[name=color]:checked').value;
+    if (editing.item) {
+      const current = findItem(editing.item.id);
+      if (current) putItem({ ...current, title, url, color });
+    } else {
+      const owner = editing.owner;
+      putItem({ id: uid(), owner, title, url, color, z: Date.now(), ...freeSpot(owner) });
+    }
+    dlg.close();
+  });
+
+  document.getElementById('f-cancel').addEventListener('click', () => dlg.close());
+  fDelete.addEventListener('click', () => {
+    if (!editing.item) return;
+    if (!confirm('Удалить «' + editing.item.title + '»?')) return;
+    removeItem(editing.item.id);
+    dlg.close();
+  });
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
+
+  document.querySelectorAll('[data-add]').forEach(b =>
+    b.addEventListener('click', () => openEditor(null, b.dataset.add)));
+
+  // ---- mobile tabs ----
+  const tabs = document.querySelectorAll('.tabs button');
+  function setTab(name) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+    Object.entries(boards).forEach(([k, el]) => el.classList.toggle('active', k === name));
+    try { localStorage.setItem(KEY + '-tab', name); } catch (e) {}
+  }
+  tabs.forEach(t => t.addEventListener('click', () => setTab(t.dataset.tab)));
+  try { const t = localStorage.getItem(KEY + '-tab'); if (t && boards[t]) setTab(t); } catch (e) {}
+
+  // keep stickers inside board on resize
+  window.addEventListener('resize', () => { if (!drag) render(); });
+
+  render();
+  connect();
+})();
+</script>
+</body>
+</html>
