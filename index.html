@@ -301,7 +301,9 @@
 // ===== НАСТРОЙКА СИНХРОНИЗАЦИИ =====
 // Вставь сюда объект firebaseConfig из консоли Firebase (инструкция в README.md).
 // Пока здесь null, желания хранятся только в этом браузере.
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  databaseURL: 'https://gravelboi-wishlist-default-rtdb.europe-west1.firebasedatabase.app',
+};
 
 (() => {
   const KEY = 'ny-wishlist-v1';
